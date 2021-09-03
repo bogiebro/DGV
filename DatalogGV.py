@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Union
 import ast
 from functools import reduce
@@ -35,19 +36,32 @@ class Binder():
         self.bindings = bindings
 
     def to(self, *code: list[str]):
-        make_edges(self.gdatalog, self.bindings, parse(code))
+        fg = make_edges(self.bindings, parse(code))
+        connect(self.gdatalog, fg)
 
 class GDatalog():
     def __init__(self):
-        pass
-    
+        self.fg = []
     def bind(self, *code: tuple[str, ...]):
         return Binder(self, parse(code))
 
+FuncNode = str
+Node = Union[Location, FuncNode]
+Edge = tuple[Node, Node]
+
+@dataclass
+class Gate:
+    conditions: list[tuple[Location, Constant]]
+    edges: 'FactorGraph'
+
+FactorGraph = list[Union[Gate, Edge]]
+
+def connect(g: GDatalog, fg: FactorGraph):
+    g.fg.extend(fg) # note: not technically correct
+
 def make_edges(
-        gdatalog: GDatalog,
         in_bindings: dict[Location, Binding],
-        out_bindings: dict[Location, Binding]):
+        out_bindings: dict[Location, Binding]) -> FactorGraph:
     scope = {}
     conditions = []
     for k, v in in_bindings.items():
@@ -55,19 +69,19 @@ def make_edges(
             scope[v] = k
         else:
             conditions.append((k, v))
-    if conditions:
-        print("Gated by", conditions)
+    edges = []
     for k,v in out_bindings.items():
         if isinstance(v, LocalVar):
             if v in scope:
-                print(scope[v], "->", k)
+                edges.append((scope[v], k))
         elif isinstance(v, FuncApp):
             for arg in v[1:]:
                 if isinstance(arg, LocalVar):
-                    print(scope[arg], "->", v[0])
-            print(v[0], "->", k)
+                    edges.append((scope[arg], v[0]))
+            edges.append((v[0], k))
+    return [Gate(conditions, edges)] if conditions else edges
 
 
 g = GDatalog()
-# g.bind("foo(x)").to("bar(x)")
-g.bind("foo(x=z, y=True)", "bing(w)").to("bar(w, x=foo(z))")
+g.bind("foo(x=z, y=True)", "bing(w)").to("bar(w, x=f(z))")
+print(g.fg)
