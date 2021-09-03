@@ -49,9 +49,14 @@ def make_edges(
         in_bindings: dict[Location, Binding],
         out_bindings: dict[Location, Binding]):
     scope = {}
+    conditions = []
     for k, v in in_bindings.items():
         if isinstance(v, LocalVar):
             scope[v] = k
+        else:
+            conditions.append((k, v))
+    if conditions:
+        print("Gated by", conditions)
     for k,v in out_bindings.items():
         if isinstance(v, LocalVar):
             if v in scope:
@@ -65,4 +70,4 @@ def make_edges(
 
 g = GDatalog()
 # g.bind("foo(x)").to("bar(x)")
-g.bind("foo(x=z)").to("bar(x=foo(z))")
+g.bind("foo(x=z, y=True)", "bing(w)").to("bar(w, x=foo(z))")
